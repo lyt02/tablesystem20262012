@@ -1,0 +1,1511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>桌号查询系统 - 支持Excel导入</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- 引入xlsx库用于处理Excel文件 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #4a6bff;
+            --secondary: #6c5ce7;
+            --success: #00b894;
+            --danger: #d63031;
+            --light: #f8f9fa;
+            --dark: #2d3436;
+            --gray: #636e72;
+            --border: #dfe6e9;
+        }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            animation: float 20s linear infinite;
+        }
+
+        @keyframes float {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .card-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-header p {
+            opacity: 0.9;
+            font-size: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .card-body {
+            padding: 30px;
+        }
+
+        .step {
+            margin-bottom: 30px;
+            padding: 15px;
+            background: var(--light);
+            border-radius: 12px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .step-number {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 28px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .step-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--dark);
+            margin-bottom: 10px;
+        }
+
+        .step-content {
+            color: var(--gray);
+            font-size: 14px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid var(--border);
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(74, 107, 255, 0.2);
+        }
+
+        .btn {
+            display: inline-block;
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+        }
+
+        .btn i {
+            margin-right: 10px;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .result-container {
+            display: none;
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            animation: fadeIn 0.8s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.9); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .result-container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            animation: float 20s linear infinite;
+        }
+
+        .result-title {
+            font-size: 20px;
+            margin-bottom: 15px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .table-number {
+            font-size: 100px;
+            font-weight: 800;
+            line-height: 1;
+            margin: 20px 0;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.2);
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-info {
+            position: relative;
+            z-index: 1;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--border);
+            border-top: 5px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            color: var(--danger);
+            background: #ffeaea;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+            border-left: 4px solid var(--danger);
+        }
+
+        .success-message {
+            color: var(--success);
+            background: #e8fff3;
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 14px;
+            display: none;
+            border-left: 4px solid var(--success);
+        }
+
+        .image-display-section {
+            text-align: center;
+            padding: 20px;
+            background: var(--light);
+            border-radius: 15px;
+            margin-top: 20px;
+        }
+
+        .image-container {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 15px;
+            background: white;
+            padding: 10px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .image-container .placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #999;
+            font-size: 14px;
+            text-align: center;
+            padding: 10px;
+        }
+
+        .image-container .placeholder i {
+            font-size: 40px;
+            margin-bottom: 10px;
+            color: #ccc;
+        }
+
+        .image-note {
+            font-size: 14px;
+            color: var(--gray);
+            margin-top: 10px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        .admin-link {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .admin-link:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* 管理面板按钮样式 */
+        .action-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .action-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: background 0.3s;
+        }
+
+        .action-btn:hover {
+            background: var(--secondary);
+        }
+
+        .action-btn.success {
+            background: var(--success);
+        }
+
+        .action-btn.info {
+            background: #17a2b8;
+        }
+
+        .action-btn.warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        /* 图片管理样式 */
+        .image-management {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+
+        .image-management h3 {
+            margin-bottom: 15px;
+            color: var(--dark);
+        }
+
+        .image-upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            background: white;
+            transition: all 0.3s;
+        }
+
+        .image-upload-area.dragover {
+            border-color: var(--primary);
+            background: rgba(74, 107, 255, 0.05);
+        }
+
+        .upload-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+
+        .upload-btn:hover {
+            background: var(--secondary);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .image-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .image-item {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .image-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .image-item.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(74, 107, 255, 0.3);
+        }
+
+        .image-item img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .image-item-info {
+            padding: 10px;
+            font-size: 12px;
+            color: var(--gray);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .image-item-actions {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .image-item:hover .image-item-actions {
+            opacity: 1;
+        }
+
+        .image-action-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            border: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 12px;
+            color: white;
+            transition: all 0.3s;
+        }
+
+        .image-action-btn.set-active {
+            background: var(--success);
+        }
+
+        .image-action-btn.delete {
+            background: var(--danger);
+        }
+
+        .current-image-info {
+            background: #e8f4ff;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 15px;
+            font-size: 13px;
+            color: var(--dark);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .card-header {
+                padding: 20px 15px;
+            }
+            
+            .card-header h1 {
+                font-size: 24px;
+            }
+            
+            .card-body {
+                padding: 20px;
+            }
+            
+            .table-number {
+                font-size: 70px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-btn {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .image-list {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+        }
+
+        /* 打印样式 */
+        @media print {
+            body {
+                background: white !important;
+            }
+            
+            .card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+            
+            .btn, .admin-link, .image-display-section {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#admin" class="admin-link">管理后台</a>
+    
+    <div class="container">
+        <div class="card">
+            <div class="card-header">
+                <h1><i class="fas fa-chair"></i> 桌号查询系统</h1>
+                <p>请输入您的姓名查询对应桌号</p>
+            </div>
+            
+            <div class="card-body">
+                <div class="step">
+                    <span class="step-number">1</span>
+                    <span class="step-title">输入姓名</span>
+                    <div class="step-content">请在下方输入框中输入您的姓名，然后点击查询按钮。</div>
+                </div>
+                
+                <form id="searchForm">
+                    <div class="form-group">
+                        <label for="name" class="form-label">您的姓名</label>
+                        <input type="text" id="name" class="form-control" placeholder="请输入您的全名" required>
+                        <div class="error-message" id="nameError">请输入有效的姓名</div>
+                    </div>
+                    
+                    <button type="submit" class="btn" id="searchBtn">
+                        <i class="fas fa-search"></i> 查询我的桌号
+                    </button>
+                </form>
+                
+                <div class="loading" id="loading">
+                    <div class="loading-spinner"></div>
+                    <p>正在查询中，请稍候...</p>
+                </div>
+                
+                <div class="result-container" id="resultContainer">
+                    <div class="result-title">查询结果</div>
+                    <div class="table-number" id="tableNumber">--</div>
+                    <div class="result-info">
+                        <p>尊敬的 <strong id="userName">--</strong>，这是您的桌号</p>
+                        <p>请前往对应位置就座</p>
+                    </div>
+                </div>
+                
+                <div class="success-message" id="successMessage">
+                    <i class="fas fa-check-circle"></i> 查询成功！
+                </div>
+                
+                <div class="image-display-section">
+                    <div class="image-container" id="imageContainer">
+                        <!-- 这里显示后台设置的图片 -->
+                        <div class="placeholder" id="imagePlaceholder">
+                            <i class="fas fa-image"></i>
+                            <span>后台未设置图片</span>
+                        </div>
+                        <img id="currentImage" style="display: none;">
+                    </div>
+                    <p class="image-note">此图片由后台管理设置，可用于显示二维码或活动图片</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>如有问题，请联系工作人员 | 系统版本 2.0 (支持Excel)</p>
+        </div>
+    </div>
+    
+    <!-- 后台管理面板 -->
+    <div id="admin" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; padding: 20px; overflow-y: auto;">
+        <div style="background: white; max-width: 900px; margin: 50px auto; padding: 30px; border-radius: 15px; position: relative;">
+            <a href="#" style="position: absolute; top: 20px; right: 20px; font-size: 30px; color: #666; text-decoration: none;">&times;</a>
+            
+            <!-- 数据管理 -->
+            <div>
+                <h2 style="margin-bottom: 20px;">数据管理</h2>
+                <p style="margin-bottom: 20px;">您可以在此修改姓名和桌号的对应关系。数据将自动保存到浏览器的本地存储中。</p>
+                
+                <div class="action-buttons">
+                    <button id="addRowBtn" class="action-btn">
+                        <i class="fas fa-plus"></i> 添加新行
+                    </button>
+                    <button id="downloadTemplateBtn" class="action-btn info">
+                        <i class="fas fa-file-download"></i> 下载Excel模板
+                    </button>
+                    <button id="importExcelBtn" class="action-btn success">
+                        <i class="fas fa-file-import"></i> 导入Excel文件
+                    </button>
+                    <button id="exportExcelBtn" class="action-btn warning">
+                        <i class="fas fa-file-export"></i> 导出Excel数据
+                    </button>
+                </div>
+                
+                <div style="overflow-x: auto; margin-bottom: 30px;">
+                    <table id="dataTable" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f5f5f5;">
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">序号</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">姓名</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">桌号</th>
+                                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody">
+                            <!-- 数据行将通过JavaScript动态添加 -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div style="margin-bottom: 30px; text-align: center;">
+                    <button id="saveDataBtn" style="background: var(--success); color: white; border: none; padding: 15px 40px; border-radius: 10px; cursor: pointer; font-size: 16px;">
+                        <i class="fas fa-save"></i> 保存数据
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 图片管理 -->
+            <div class="image-management">
+                <h3>图片管理</h3>
+                <p style="margin-bottom: 15px;">您可以上传多张图片，并选择一张作为当前显示的图片。</p>
+                
+                <div class="current-image-info">
+                    <p><i class="fas fa-info-circle"></i> 当前显示的图片：<span id="currentImageName">未设置</span></p>
+                </div>
+                
+                <div class="image-upload-area" id="imageUploadArea">
+                    <p>将图片拖放到此处，或</p>
+                    <input type="file" id="imageUpload" class="file-input" accept="image/*" multiple>
+                    <label for="imageUpload" class="upload-btn">
+                        <i class="fas fa-upload"></i> 选择图片上传
+                    </label>
+                    <p style="font-size: 12px; color: #999; margin-top: 10px;">支持 JPG、PNG、GIF 格式，单张图片不超过 2MB</p>
+                </div>
+                
+                <div class="image-list" id="imageList">
+                    <!-- 图片将通过JavaScript动态添加 -->
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="generateQRBtn" class="upload-btn">
+                        <i class="fas fa-qrcode"></i> 生成当前页面二维码
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 默认数据（如果本地存储没有数据，则使用这个）
+        const defaultData = [
+            { name: "张三", table: "1" },
+            { name: "李四", table: "2" },
+            { name: "王五", table: "3" },
+            { name: "赵六", table: "4" },
+            { name: "钱七", table: "5" },
+            { name: "孙八", table: "6" },
+            { name: "周九", table: "7" },
+            { name: "吴十", table: "8" },
+            { name: "郑十一", table: "9" },
+            { name: "王十二", table: "10" },
+            { name: "刘十三", table: "11" },
+            { name: "陈十四", table: "12" },
+            { name: "杨十五", table: "13" },
+            { name: "黄十六", table: "14" },
+            { name: "赵十七", table: "15" },
+            { name: "周十八", table: "16" },
+            { name: "吴十九", table: "17" },
+            { name: "郑二十", table: "18" }
+        ];
+
+        // 图片数据管理
+        const imagesData = {
+            // 保存所有上传的图片
+            images: [],
+            // 当前选中的图片ID
+            currentImageId: null,
+            
+            // 从本地存储加载
+            load: function() {
+                const saved = localStorage.getItem('imageData');
+                if (saved) {
+                    const data = JSON.parse(saved);
+                    this.images = data.images || [];
+                    this.currentImageId = data.currentImageId || null;
+                }
+                return this;
+            },
+            
+            // 保存到本地存储
+            save: function() {
+                const data = {
+                    images: this.images,
+                    currentImageId: this.currentImageId
+                };
+                localStorage.setItem('imageData', JSON.stringify(data));
+                return this;
+            },
+            
+            // 添加新图片
+            addImage: function(name, dataUrl) {
+                const id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                const image = {
+                    id: id,
+                    name: name,
+                    dataUrl: dataUrl,
+                    timestamp: new Date().toISOString(),
+                    size: this._estimateSize(dataUrl)
+                };
+                this.images.unshift(image); // 添加到开头
+                this.save();
+                return image;
+            },
+            
+            // 删除图片
+            removeImage: function(id) {
+                const index = this.images.findIndex(img => img.id === id);
+                if (index !== -1) {
+                    this.images.splice(index, 1);
+                    // 如果删除的是当前选中的图片，清除当前选中
+                    if (this.currentImageId === id) {
+                        this.currentImageId = null;
+                    }
+                    this.save();
+                    return true;
+                }
+                return false;
+            },
+            
+            // 设置当前图片
+            setCurrentImage: function(id) {
+                const image = this.images.find(img => img.id === id);
+                if (image) {
+                    this.currentImageId = id;
+                    this.save();
+                    return image;
+                }
+                return null;
+            },
+            
+            // 获取当前图片
+            getCurrentImage: function() {
+                if (this.currentImageId) {
+                    return this.images.find(img => img.id === this.currentImageId);
+                }
+                return null;
+            },
+            
+            // 估算图片大小（近似值）
+            _estimateSize: function(dataUrl) {
+                // Base64编码的数据大小约为原数据的4/3
+                const base64Length = dataUrl.length - (dataUrl.indexOf(',') + 1);
+                const padding = (dataUrl.charAt(dataUrl.length - 2) === '=' ? 2 : (dataUrl.charAt(dataUrl.length - 1) === '=' ? 1 : 0));
+                return Math.ceil((base64Length * 3) / 4 - padding);
+            },
+            
+            // 格式化大小显示
+            formatSize: function(bytes) {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            }
+        };
+
+        // 从本地存储加载数据，如果没有则使用默认数据
+        function loadTableData() {
+            const savedData = localStorage.getItem('tableData');
+            if (savedData) {
+                return JSON.parse(savedData);
+            } else {
+                // 保存默认数据到本地存储
+                saveTableData(defaultData);
+                return defaultData;
+            }
+        }
+
+        // 保存数据到本地存储
+        function saveTableData(data) {
+            localStorage.setItem('tableData', JSON.stringify(data));
+        }
+
+        // 根据姓名查找桌号
+        function findTableByName(name) {
+            const tableData = loadTableData();
+            const normalizedName = name.trim().toLowerCase();
+            
+            // 首先尝试精确匹配
+            const exactMatch = tableData.find(item => 
+                item.name.toLowerCase() === normalizedName
+            );
+            
+            if (exactMatch) {
+                return { 
+                    success: true, 
+                    table: exactMatch.table, 
+                    name: exactMatch.name,
+                    matchType: 'exact'
+                };
+            }
+            
+            // 如果没有精确匹配，尝试模糊匹配（包含关系）
+            const fuzzyMatch = tableData.find(item => 
+                item.name.toLowerCase().includes(normalizedName) || 
+                normalizedName.includes(item.name.toLowerCase())
+            );
+            
+            if (fuzzyMatch) {
+                return { 
+                    success: true, 
+                    table: fuzzyMatch.table, 
+                    name: fuzzyMatch.name,
+                    matchType: 'fuzzy'
+                };
+            }
+            
+            // 如果没有找到
+            return { success: false, table: null, name: null };
+        }
+
+        // DOM元素
+        const searchForm = document.getElementById('searchForm');
+        const nameInput = document.getElementById('name');
+        const searchBtn = document.getElementById('searchBtn');
+        const loadingDiv = document.getElementById('loading');
+        const resultContainer = document.getElementById('resultContainer');
+        const tableNumberDiv = document.getElementById('tableNumber');
+        const userNameDiv = document.getElementById('userName');
+        const nameErrorDiv = document.getElementById('nameError');
+        const successMessageDiv = document.getElementById('successMessage');
+        const currentImage = document.getElementById('currentImage');
+        const imagePlaceholder = document.getElementById('imagePlaceholder');
+        const currentImageName = document.getElementById('currentImageName');
+
+        // 表单提交处理
+        searchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const name = nameInput.value.trim();
+            
+            // 验证输入
+            if (!name) {
+                showError('请输入您的姓名');
+                return;
+            }
+            
+            if (name.length < 2) {
+                showError('姓名至少需要2个字符');
+                return;
+            }
+            
+            // 显示加载中
+            showLoading(true);
+            hideError();
+            hideSuccess();
+            
+            // 模拟网络请求延迟
+            setTimeout(() => {
+                // 查找桌号
+                const result = findTableByName(name);
+                
+                // 隐藏加载中
+                showLoading(false);
+                
+                if (result.success) {
+                    // 显示结果
+                    tableNumberDiv.textContent = result.table;
+                    userNameDiv.textContent = result.name;
+                    
+                    // 添加动画效果
+                    resultContainer.style.display = 'block';
+                    tableNumberDiv.style.transform = 'scale(1.2)';
+                    setTimeout(() => {
+                        tableNumberDiv.style.transform = 'scale(1)';
+                        tableNumberDiv.style.transition = 'transform 0.5s';
+                    }, 300);
+                    
+                    // 显示成功消息
+                    showSuccess(`找到您的桌号！匹配类型：${result.matchType === 'exact' ? '精确匹配' : '模糊匹配'}`);
+                    
+                    // 记录查询日志（可选）
+                    logQuery(name, result.table, result.matchType);
+                } else {
+                    // 显示未找到
+                    showError(`抱歉，未找到 "${name}" 对应的桌号。请检查姓名是否正确，或联系工作人员。`);
+                    resultContainer.style.display = 'none';
+                }
+            }, 800);
+        });
+
+        // 显示/隐藏加载状态
+        function showLoading(show) {
+            if (show) {
+                loadingDiv.style.display = 'block';
+                searchBtn.disabled = true;
+                searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 查询中...';
+            } else {
+                loadingDiv.style.display = 'none';
+                searchBtn.disabled = false;
+                searchBtn.innerHTML = '<i class="fas fa-search"></i> 查询我的桌号';
+            }
+        }
+
+        // 显示错误消息
+        function showError(message) {
+            nameErrorDiv.textContent = message;
+            nameErrorDiv.style.display = 'block';
+            resultContainer.style.display = 'none';
+        }
+
+        // 隐藏错误消息
+        function hideError() {
+            nameErrorDiv.style.display = 'none';
+        }
+
+        // 显示成功消息
+        function showSuccess(message) {
+            successMessageDiv.textContent = message;
+            successMessageDiv.style.display = 'block';
+            
+            // 5秒后自动隐藏
+            setTimeout(() => {
+                successMessageDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // 隐藏成功消息
+        function hideSuccess() {
+            successMessageDiv.style.display = 'none';
+        }
+
+        // 记录查询日志（存储在本地）
+        function logQuery(name, table, matchType) {
+            const logs = JSON.parse(localStorage.getItem('queryLogs') || '[]');
+            const logEntry = {
+                name,
+                table,
+                matchType,
+                timestamp: new Date().toISOString(),
+                userAgent: navigator.userAgent
+            };
+            
+            logs.push(logEntry);
+            
+            // 只保留最近的100条记录
+            if (logs.length > 100) {
+                logs.shift();
+            }
+            
+            localStorage.setItem('queryLogs', JSON.stringify(logs));
+            console.log('查询已记录:', logEntry);
+        }
+
+        // 更新当前显示的图片
+        function updateCurrentImage() {
+            const currentImageData = imagesData.getCurrentImage();
+            
+            if (currentImageData) {
+                currentImage.src = currentImageData.dataUrl;
+                currentImage.style.display = 'block';
+                imagePlaceholder.style.display = 'none';
+                currentImageName.textContent = currentImageData.name;
+            } else {
+                currentImage.style.display = 'none';
+                imagePlaceholder.style.display = 'flex';
+                currentImageName.textContent = '未设置';
+            }
+        }
+
+        // 渲染图片列表
+        function renderImageList() {
+            const imageList = document.getElementById('imageList');
+            imageList.innerHTML = '';
+            
+            imagesData.images.forEach(image => {
+                const isActive = imagesData.currentImageId === image.id;
+                
+                const imageItem = document.createElement('div');
+                imageItem.className = `image-item ${isActive ? 'active' : ''}`;
+                imageItem.innerHTML = `
+                    <img src="${image.dataUrl}" alt="${image.name}">
+                    <div class="image-item-info">
+                        <span>${image.name.length > 15 ? image.name.substring(0, 15) + '...' : image.name}</span>
+                        <span>${imagesData.formatSize(image.size)}</span>
+                    </div>
+                    <div class="image-item-actions">
+                        <button class="image-action-btn set-active" title="设为当前显示" data-id="${image.id}">
+                            <i class="fas fa-check"></i>
+                        </button>
+                        <button class="image-action-btn delete" title="删除图片" data-id="${image.id}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                imageList.appendChild(imageItem);
+            });
+            
+            // 绑定按钮事件
+            document.querySelectorAll('.image-action-btn.set-active').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.getAttribute('data-id');
+                    imagesData.setCurrentImage(id);
+                    renderImageList();
+                    updateCurrentImage();
+                    showImageMessage('已设置为此图片为当前显示');
+                });
+            });
+            
+            document.querySelectorAll('.image-action-btn.delete').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const id = this.getAttribute('data-id');
+                    const image = imagesData.images.find(img => img.id === id);
+                    
+                    if (confirm(`确定要删除图片 "${image.name}" 吗？`)) {
+                        imagesData.removeImage(id);
+                        renderImageList();
+                        updateCurrentImage();
+                        showImageMessage('图片已删除');
+                    }
+                });
+            });
+            
+            // 点击图片项也可以设置为当前图片
+            document.querySelectorAll('.image-item').forEach(item => {
+                item.addEventListener('click', function(e) {
+                    if (!e.target.closest('.image-item-actions')) {
+                        const id = this.querySelector('.set-active').getAttribute('data-id');
+                        imagesData.setCurrentImage(id);
+                        renderImageList();
+                        updateCurrentImage();
+                        showImageMessage('已设置为此图片为当前显示');
+                    }
+                });
+            });
+        }
+
+        // 显示图片操作消息
+        function showImageMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'success-message';
+            messageDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+            messageDiv.style.position = 'fixed';
+            messageDiv.style.top = '20px';
+            messageDiv.style.right = '20px';
+            messageDiv.style.zIndex = '1001';
+            
+            document.body.appendChild(messageDiv);
+            
+            // 3秒后自动移除
+            setTimeout(() => {
+                if (messageDiv.parentNode === document.body) {
+                    document.body.removeChild(messageDiv);
+                }
+            }, 3000);
+        }
+
+        // ==================== 图片上传功能 ====================
+        const imageUpload = document.getElementById('imageUpload');
+        const imageUploadArea = document.getElementById('imageUploadArea');
+        
+        // 拖放上传功能
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            imageUploadArea.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        ['dragenter', 'dragover'].forEach(eventName => {
+            imageUploadArea.addEventListener(eventName, highlight, false);
+        });
+        
+        ['dragleave', 'drop'].forEach(eventName => {
+            imageUploadArea.addEventListener(eventName, unhighlight, false);
+        });
+        
+        function highlight() {
+            imageUploadArea.classList.add('dragover');
+        }
+        
+        function unhighlight() {
+            imageUploadArea.classList.remove('dragover');
+        }
+        
+        imageUploadArea.addEventListener('drop', handleDrop, false);
+        
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles(files);
+        }
+        
+        // 文件选择上传
+        imageUpload.addEventListener('change', function(e) {
+            const files = e.target.files;
+            handleFiles(files);
+            // 清除input的值，以便可以再次选择相同的文件
+            this.value = '';
+        });
+        
+        function handleFiles(files) {
+            [...files].forEach(file => {
+                if (!file.type.match('image.*')) {
+                    alert(`文件 "${file.name}" 不是图片格式！`);
+                    return;
+                }
+                
+                if (file.size > 2 * 1024 * 1024) {
+                    alert(`图片 "${file.name}" 大小超过2MB限制！`);
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const fileName = file.name.length > 20 ? file.name.substring(0, 20) + '...' : file.name;
+                    const image = imagesData.addImage(fileName, e.target.result);
+                    
+                    // 如果是第一张图片，自动设置为当前图片
+                    if (imagesData.images.length === 1) {
+                        imagesData.setCurrentImage(image.id);
+                    }
+                    
+                    renderImageList();
+                    updateCurrentImage();
+                    showImageMessage(`图片 "${fileName}" 上传成功`);
+                };
+                
+                reader.readAsDataURL(file);
+            });
+        }
+        
+        // 生成二维码
+        document.getElementById('generateQRBtn').addEventListener('click', function() {
+            // 获取当前页面的URL
+            const currentUrl = window.location.href;
+            
+            // 使用QR Code API生成二维码
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(currentUrl)}`;
+            
+            // 添加为图片
+            const image = imagesData.addImage('页面二维码', qrUrl);
+            imagesData.setCurrentImage(image.id);
+            
+            renderImageList();
+            updateCurrentImage();
+            showImageMessage('二维码生成成功并已设为当前显示');
+        });
+
+        // ==================== Excel文件处理功能 ====================
+        
+        // 下载Excel模板
+        document.getElementById('downloadTemplateBtn').addEventListener('click', function() {
+            // 创建模板数据
+            const templateData = [
+                ["姓名", "桌号"],
+                ["张三", "1"],
+                ["李四", "2"],
+                ["王五", "3"],
+                ["赵六", "4"],
+                ["钱七", "5"]
+            ];
+            
+            // 创建工作簿
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(templateData);
+            
+            // 设置列宽
+            ws['!cols'] = [{wch: 15}, {wch: 10}];
+            
+            // 添加工作表到工作簿
+            XLSX.utils.book_append_sheet(wb, ws, "桌号数据");
+            
+            // 生成Excel文件并下载
+            XLSX.writeFile(wb, "桌号查询模板.xlsx");
+        });
+        
+        // 导入Excel文件
+        document.getElementById('importExcelBtn').addEventListener('click', function() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.xlsx, .xls, .xlsm';
+            
+            fileInput.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, {type: 'array'});
+                        
+                        // 获取第一个工作表
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        
+                        // 转换为JSON格式
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+                        
+                        if (jsonData.length < 2) {
+                            alert('Excel文件为空或格式不正确！');
+                            return;
+                        }
+                        
+                        // 智能识别列名
+                        const headers = jsonData[0];
+                        let nameIndex = -1;
+                        let tableIndex = -1;
+                        
+                        // 尝试找到姓名和桌号列
+                        for (let i = 0; i < headers.length; i++) {
+                            const header = String(headers[i]).toLowerCase();
+                            if (header.includes('姓名') || header.includes('name') || header.includes('姓')) {
+                                nameIndex = i;
+                            } else if (header.includes('桌号') || header.includes('table') || header.includes('桌')) {
+                                tableIndex = i;
+                            }
+                        }
+                        
+                        // 如果没找到标准列名，使用前两列
+                        if (nameIndex === -1) nameIndex = 0;
+                        if (tableIndex === -1) tableIndex = 1;
+                        
+                        // 提取数据
+                        const importedData = [];
+                        for (let i = 1; i < jsonData.length; i++) {
+                            const row = jsonData[i];
+                            if (row[nameIndex] && row[tableIndex]) {
+                                importedData.push({
+                                    name: String(row[nameIndex]).trim(),
+                                    table: String(row[tableIndex]).trim()
+                                });
+                            }
+                        }
+                        
+                        if (importedData.length === 0) {
+                            alert('未在Excel文件中找到有效数据！');
+                            return;
+                        }
+                        
+                        // 显示导入的数据
+                        fillTableWithData(importedData);
+                        
+                        alert(`成功导入 ${importedData.length} 条记录！请检查数据，确认无误后点击"保存数据"按钮。`);
+                        
+                    } catch (error) {
+                        console.error('Excel文件解析错误:', error);
+                        alert('Excel文件解析失败，请检查文件格式！');
+                    }
+                };
+                
+                reader.readAsArrayBuffer(file);
+            };
+            
+            fileInput.click();
+        });
+        
+        // 导出Excel数据
+        document.getElementById('exportExcelBtn').addEventListener('click', function() {
+            const data = loadTableData();
+            
+            if (data.length === 0) {
+                alert('没有数据可导出！');
+                return;
+            }
+            
+            // 准备数据
+            const exportData = [
+                ["姓名", "桌号"]
+            ];
+            
+            data.forEach(item => {
+                exportData.push([item.name, item.table]);
+            });
+            
+            // 创建工作簿
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(exportData);
+            
+            // 设置列宽
+            ws['!cols'] = [{wch: 20}, {wch: 15}];
+            
+            // 添加工作表到工作簿
+            XLSX.utils.book_append_sheet(wb, ws, "桌号数据");
+            
+            // 生成Excel文件并下载
+            XLSX.writeFile(wb, `桌号数据_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
+        
+        // 填充表格数据
+        function fillTableWithData(data) {
+            const tableBody = document.getElementById('tableBody');
+            tableBody.innerHTML = '';
+            
+            data.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">${index + 1}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <input type="text" class="edit-name" value="${item.name}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <input type="text" class="edit-table" value="${item.table}" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </td>
+                    <td style="padding: 10px; border-bottom: 1px solid #ddd;">
+                        <button class="delete-row" data-index="${index}" style="background: var(--danger); color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;">删除</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+            
+            // 重新绑定删除按钮事件
+            document.querySelectorAll('.delete-row').forEach(button => {
+                button.addEventListener('click', function() {
+                    const index = parseInt(this.getAttribute('data-index'));
+                    deleteRow(index);
+                });
+            });
+        }
+        
+        // 加载数据到管理表格
+        function loadDataIntoTable() {
+            const data = loadTableData();
+            fillTableWithData(data);
+        }
+
+        // ==================== 后台管理面板功能 ====================
+        
+        // 后台管理面板功能
+        document.querySelector('.admin-link').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('admin').style.display = 'block';
+            loadDataIntoTable();
+            renderImageList();
+        });
+
+        document.querySelector('#admin a').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('admin').style.display = 'none';
+        });
+
+        // 添加新行
+        document.getElementById('addRowBtn').addEventListener('click', function() {
+            const data = loadTableData();
+            data.push({ name: "新姓名", table: "新桌号" });
+            saveTableData(data);
+            loadDataIntoTable();
+        });
+
+        // 删除行
+        function deleteRow(index) {
+            if (confirm('确定要删除这一行吗？')) {
+                const data = loadTableData();
+                data.splice(index, 1);
+                saveTableData(data);
+                loadDataIntoTable();
+            }
+        }
+
+        // 保存数据
+        document.getElementById('saveDataBtn').addEventListener('click', function() {
+            const nameInputs = document.querySelectorAll('.edit-name');
+            const tableInputs = document.querySelectorAll('.edit-table');
+            const newData = [];
+            
+            for (let i = 0; i < nameInputs.length; i++) {
+                const name = nameInputs[i].value.trim();
+                const table = tableInputs[i].value.trim();
+                
+                if (name && table) {
+                    newData.push({ name, table });
+                }
+            }
+            
+            saveTableData(newData);
+            alert('数据保存成功！');
+        });
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载图片数据
+            imagesData.load();
+            
+            // 更新当前显示的图片
+            updateCurrentImage();
+            
+            // 检查URL中是否有姓名参数（方便测试）
+            const urlParams = new URLSearchParams(window.location.search);
+            const nameParam = urlParams.get('name');
+            
+            if (nameParam) {
+                nameInput.value = nameParam;
+                // 自动提交表单
+                searchForm.dispatchEvent(new Event('submit'));
+            }
+            
+            // 显示数据统计
+            const data = loadTableData();
+            console.log(`系统已加载 ${data.length} 条桌号记录`);
+            console.log(`系统已加载 ${imagesData.images.length} 张图片`);
+        });
+    </script>
+</body>
+</html>
